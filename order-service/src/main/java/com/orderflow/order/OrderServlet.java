@@ -1,10 +1,16 @@
 package com.orderflow.order;
 
+import com.orderflow.order.model.Order;
+
+import jakarta.annotation.Resource;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.UserTransaction;
 
 import org.apache.log4j.Logger;
 import org.apache.log4j.MDC;
@@ -18,25 +24,48 @@ public class OrderServlet extends HttpServlet {
 
     private static final Logger logger = Logger.getLogger(OrderServlet.class);
 
+    @PersistenceContext(unitName = "orderflowPU")
+    private EntityManager em;
+
+    @Resource
+    private UserTransaction utx;
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        String orderId = UUID.randomUUID().toString();
-
-        // This is the Log4j 1.x specific API call.
-        // Log4j 1.x MDC.put(String, Object) signature.
-        // If Log4j 2.x's classes load instead (classloader conflict),
-        // this line throws NoSuchMethodError at runtime.
-        MDC.put("orderId", orderId);
-
+        String orderRef = UUID.randomUUID().toString();
+        MDC.put("orderId", orderRef);
         logger.info("Processing new order request");
 
-        resp.setContentType("text/plain");
-        PrintWriter out = resp.getWriter();
-        out.println("Order created successfully!");
-        out.println("Order ID: " + orderId);
+        try {
+            utx.begin();
 
-        MDC.remove("orderId");
+            Order order = new Order(orderRef, "CREATED");
+            em.persist(order);
+
+            utx.commit();
+
+            resp.setContentType("text/plain");
+            PrintWriter out = resp.getWriter();
+            out.println("Order created and persisted successfully!");
+            out.println("Order Ref: " + orderRef);
+            out.println("Database ID: " + order.getId());
+
+        } catch (Exception e) {
+            logger.error("Failed to persist order - likely a database connectivity issue", e);
+            try {
+                utx.rollback();
+            } catch (Exception rollbackEx) {
+                logger.error("Rollback also failed", rollbackEx);
+            }
+
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            resp.setContentType("text/plain");
+            PrintWriter out = resp.getWriter();
+            out.println("Order creation failed: " + e.getMessage());
+        } finally {
+            MDC.remove("orderId");
+        }
     }
 }
