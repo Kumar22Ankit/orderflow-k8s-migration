@@ -1,0 +1,9 @@
+embed-server --std-out=echo
+
+# Register the PostgreSQL JDBC driver
+/subsystem=datasources/jdbc-driver=postgresql:add(driver-name=postgresql, driver-module-name=org.postgresql, driver-class-name=org.postgresql.Driver)
+
+# Add the datasource with connection pool hardening
+data-source add --name=TaskFlowDS --jndi-name=java:jboss/datasources/TaskFlowDS --driver-name=postgresql --connection-url=${env.DB_URL:jdbc:postgresql://localhost:5432/orderflow} --user-name=${env.DB_USER:orderflow_app} --password=${env.DB_PASSWORD:changeme} --enabled=true --use-ccm=false --min-pool-size=5 --max-pool-size=20 --background-validation=true --background-validation-millis=10000 --valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker --exception-sorter-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLExceptionSorter
+
+stop-embedded-server
