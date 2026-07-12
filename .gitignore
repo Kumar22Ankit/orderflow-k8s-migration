@@ -1,0 +1,6 @@
+target/
+wildfly-server/
+*.war
+*.class
+.idea/
+*.iml
